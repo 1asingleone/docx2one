@@ -6,7 +6,7 @@ Merge multiple Word (.docx) documents into one — right in your browser. No upl
 
 ## Usage
 
-1. **Open** `index.html` in Chrome/Edge/Firefox
+1. **Open** `docx2one.html` in Chrome/Edge/Firefox
 2. **Drag** .docx files onto the drop zone (or click to select)
 3. **Drag** file items to reorder
 4. **Check** what to include: body, headers, footers, page numbers
