@@ -1,44 +1,39 @@
-# x2one — 浏览器端文档合并工具集
+# docx2one
 
-Merge Word, PDF, and PowerPoint files in your browser. No uploads, no servers, no installation.
+Merge multiple Word (.docx) documents into one — right in your browser. No uploads, no servers, no installation.
 
-在浏览器中合并 Word、PDF、PowerPoint 文件。不上传、不安装、开箱即用。
+合并多个 Word 文档为一个文件 — 纯浏览器端完成，不上传、不安装、开箱即用。
 
----
-
-## 工具 / Tools
-
-| 工具 | 格式 | 在线使用 | 核心技术 |
-|------|------|----------|----------|
-| **docx2one** | .docx | [试用](https://1asingleone.github.io/docx2one/docx2one.html) | JSZip + DOM 合并 XML |
-| **pdf2one** | .pdf | [试用](https://1asingleone.github.io/docx2one/pdf2one.html) | pdf-lib 逐页复制 |
-| **pptx2one** | .pptx | [试用](https://1asingleone.github.io/docx2one/pptx2one.html) | JSZip + DOM 合并幻灯片 |
+**Try online:** https://1asingleone.github.io/docx2one/docx2one.html
 
 ---
 
-## 功能对比
+## Usage
 
-| 功能 | docx2one | pdf2one | pptx2one |
-|------|:--------:|:-------:|:--------:|
-| 拖拽排序 | ✅ | ✅ | ✅ |
-| 选择性合并正文/页眉/页脚/页码 | ✅ | — | — |
-| 页面设置冲突处理 | ✅ | — | — |
-| 自动分页 | 分页符 | 逐页拼接 | 追加幻灯片 |
-| 图片/媒体重映射 | ✅ | — | ✅ |
-| 样式/编号合并 | ✅ | — | — |
+1. Open `docx2one.html` in Chrome/Edge/Firefox
+2. Drag .docx files onto the drop zone (or click to select)
+3. Drag file items to reorder
+4. Check what to include: body, headers, footers, page numbers
+5. Choose page-setting conflict strategy
+6. Click the merge button to download
 
----
+## How it works
 
-## 原理
+.docx files are ZIP archives containing XML:
 
-所有工具遵循同一技术路线：
+1. [JSZip](https://stuk.github.io/jszip/) unpacks each document in-browser
+2. `document.xml` bodies are concatenated with page breaks between documents
+3. `styles.xml` definitions are deduplicated by styleId
+4. `numbering.xml` IDs are rebased to avoid collisions
+5. `rId` references to images, embedded files, headers and footers are remapped
+6. Headers, footers and page numbering are included per user preference
+7. Everything is repacked into a new `.docx` for download
 
-> **解包 → 合并内容 → 重映射引用 → 打包**
+## Compatibility
 
-- **docx / pptx**：ZIP + XML 结构，用 JSZip 解包，DOM 操作 XML，JSZip 重新打包
-- **pdf**：二进制格式，用 pdf-lib 直接操作页面对象
-
----
+- Chrome 60+, Edge 79+, Firefox 55+, Safari 12+
+- `.docx` only (Office 2007+). Legacy `.doc` is **not** supported
+- Recommended: up to 10 documents at once
 
 ## License
 
