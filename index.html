@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>docx2one - Word 文档合并工具</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;background:#f0f2f5;color:#333;min-height:100vh}
+.container{max-width:720px;margin:0 auto;padding:24px 16px 60px}
+header{text-align:center;margin-bottom:28px}
+header h1{font-size:28px;font-weight:700;color:#1a1a2e;letter-spacing:-0.5px}
+header h1 span{color:#4361ee}
+header p{font-size:14px;color:#888;margin-top:6px}
+.drop-zone{background:#fff;border:2px dashed #ccc;border-radius:12px;padding:40px 20px;text-align:center;cursor:pointer;transition:all .2s;position:relative}
+.drop-zone:hover,.drop-zone.dragover{border-color:#4361ee;background:#f8f9ff}
+.drop-zone .icon{font-size:40px;display:block;margin-bottom:10px;line-height:1}
+.drop-zone p{font-size:14px;color:#999;margin-top:6px}
+.drop-zone .file-btn{display:inline-block;margin-top:12px;padding:8px 24px;background:#4361ee;color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer;transition:background .15s}
+.drop-zone .file-btn:hover{background:#3651d4}
+.file-section{background:#fff;border-radius:12px;margin-top:16px;overflow:hidden;display:none}
+.file-section.visible{display:block}
+.file-section-header{padding:16px 20px 8px;font-size:15px;font-weight:600;color:#333}
+.file-item{display:flex;align-items:center;padding:10px 20px;border-bottom:1px solid #f0f0f0;transition:background .15s;user-select:none}
+.file-item:last-child{border-bottom:none}
+.file-item.dragging{opacity:.4}
+.file-item.drag-over{border-top:2px solid #4361ee}
+.file-item .index{width:28px;font-size:13px;color:#999;text-align:center;flex-shrink:0}
+.file-item .info{flex:1;min-width:0;padding:0 10px}
+.file-item .name{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.file-item .meta{font-size:12px;color:#999;margin-top:2px}
+.file-item .drag-handle{cursor:grab;color:#bbb;font-size:16px;padding:4px;flex-shrink:0}
+.file-item .drag-handle:active{cursor:grabbing}
+.file-item .btn-del{background:none;border:none;color:#bbb;font-size:16px;cursor:pointer;padding:4px;flex-shrink:0;transition:color .15s}
+.file-item .btn-del:hover{color:#e74c3c}
+.options-card{background:#fff;border-radius:12px;margin-top:16px;padding:20px}
+.options-card h3{font-size:15px;font-weight:600;margin-bottom:14px;color:#333}
+.opt-group{display:flex;flex-wrap:wrap;gap:16px}
+.opt-group label{display:flex;align-items:center;gap:7px;font-size:14px;cursor:pointer;color:#444;user-select:none}
+.opt-group label input[type="checkbox"]{width:16px;height:16px;accent-color:#4361ee;cursor:pointer}
+.opt-group label input[type="radio"]{width:16px;height:16px;accent-color:#4361ee;cursor:pointer}
+.actions{display:flex;justify-content:center;margin-top:20px}
+.actions button{padding:12px 48px;font-size:16px;font-weight:600;background:#4361ee;color:#fff;border:none;border-radius:8px;cursor:pointer;transition:background .15s,transform .1s;letter-spacing:0.5px}
+.actions button:hover{background:#3651d4}
+.actions button:active{transform:scale(.97)}
+.actions button:disabled{background:#a0b0e8;cursor:not-allowed;transform:none}
+.status{text-align:center;margin-top:16px;font-size:14px;color:#666;min-height:24px}
+.status.error{color:#e74c3c}
+.status.success{color:#27ae60}
+@media(max-width:500px){
+  .container{padding:16px 12px 40px}
+  .drop-zone{padding:28px 16px}
+  .file-item{padding:10px 14px}
+  .options-card{padding:16px}
+  .actions button{padding:12px 36px}
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>docx<span>2</span>one</h1>
+    <p>Word 文档合并工具 · 纯浏览器端，文件不会上传</p>
+  </header>
+
+  <div class="drop-zone" id="dropZone">
+    <div class="icon">📄</div>
+    <p>拖拽 .docx 文件到此处</p>
+    <p style="margin-top:4px">或</p>
+    <button class="file-btn" id="selectBtn">选择文件</button>
+    <input type="file" id="fileInput" multiple accept=".docx" hidden>
+  </div>
+
+  <div class="file-section" id="fileSection">
+    <div class="file-section-header">已选择 <span id="fileCount">0</span> 个文件<span style="font-weight:400;color:#999;font-size:13px">（拖拽可调整顺序）</span></div>
+    <div id="fileList"></div>
+  </div>
+
+  <div class="options-card" id="optionsCard" style="display:none">
+    <h3>合并选项</h3>
+    <div class="opt-group" style="margin-bottom:16px">
+      <label><input type="checkbox" id="optBody" checked> 正文内容</label>
+      <label><input type="checkbox" id="optHeaders"> 页眉</label>
+      <label><input type="checkbox" id="optFooters"> 页脚</label>
+      <label><input type="checkbox" id="optPgNum"> 页码</label>
+    </div>
+    <h3>页面设置冲突</h3>
+    <div class="opt-group">
+      <label><input type="radio" name="pageSettings" value="first" checked> 以第一个文档为准</label>
+      <label><input type="radio" name="pageSettings" value="each"> 保留各自设置</label>
+    </div>
+  </div>
+
+  <div class="actions" id="actions" style="display:none">
+    <button id="mergeBtn">合并并下载</button>
+  </div>
+
+  <div class="status" id="status"></div>
+</div>
+
+<script>
+// ==================== 常量 ====================
+const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+const R_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+const RELS_NS = 'http://schemas.openxmlformats.org/package/2006/relationships';
+const CT_NS = 'http://schemas.openxmlformats.org/package/2006/content-types';
+const MC_NS = 'http://schemas.openxmlformats.org/markup-compatibility/2006';
+
+const RELS_IMAGE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image';
+const RELS_HEADER = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/header';
+const RELS_FOOTER = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer';
+
+// ==================== 状态 ====================
+let fileItems = [];
+
+// ==================== DOM 引用 ====================
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const selectBtn = document.getElementById('selectBtn');
+const fileSection = document.getElementById('fileSection');
+const fileListEl = document.getElementById('fileList');
+const fileCount = document.getElementById('fileCount');
+const optionsCard = document.getElementById('optionsCard');
+const actions = document.getElementById('actions');
+const statusEl = document.getElementById('status');
+const mergeBtn = document.getElementById('mergeBtn');
+
+// ==================== UI 初始化 ====================
+selectBtn.addEventListener('click', e => { e.stopPropagation(); fileInput.click(); });
+dropZone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => {
+  if (fileInput.files.length) addFiles(fileInput.files);
+  fileInput.value = '';
+});
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
+});
+
+fileListEl.addEventListener('dragover', e => e.preventDefault());
+
+function addFiles(fileList) {
+  const added = [];
+  for (const f of fileList) {
+    if (!f.name.toLowerCase().endsWith('.docx')) continue;
+    if (fileItems.some(it => it.file === f || (it.name === f.name && it.size === f.size))) continue;
+    fileItems.push({ file: f, name: f.name, size: f.size });
+    added.push(f.name);
+  }
+  if (added.length) {
+    setStatus(`已添加 ${added.length} 个文件`, '');
+    renderFileList();
+  }
+}
+
+function removeFile(idx) {
+  fileItems.splice(idx, 1);
+  renderFileList();
+}
+
+function renderFileList() {
+  fileListEl.innerHTML = '';
+  if (!fileItems.length) {
+    fileSection.classList.remove('visible');
+    optionsCard.style.display = 'none';
+    actions.style.display = 'none';
+    return;
+  }
+  fileSection.classList.add('visible');
+  optionsCard.style.display = 'block';
+  actions.style.display = 'flex';
+  fileCount.textContent = fileItems.length;
+
+  fileItems.forEach((item, idx) => {
+    const div = document.createElement('div');
+    div.className = 'file-item';
+    div.draggable = true;
+    div.dataset.index = idx;
+
+    const sizeStr = item.size < 1024 * 1024
+      ? (item.size / 1024).toFixed(1) + ' KB'
+      : (item.size / 1024 / 1024).toFixed(1) + ' MB';
+
+    div.innerHTML = `
+      <span class="index">${idx + 1}</span>
+      <span class="drag-handle" title="拖拽排序">⠿</span>
+      <div class="info">
+        <div class="name">${escapeHtml(item.name)}</div>
+        <div class="meta">${sizeStr}</div>
+      </div>
+      <button class="btn-del" title="移除" data-idx="${idx}">&#10005;</button>
+    `;
+
+    div.addEventListener('dragstart', e => {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', idx);
+      setTimeout(() => div.classList.add('dragging'), 0);
+    });
+    div.addEventListener('dragend', () => div.classList.remove('dragging'));
+    div.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      div.classList.add('drag-over');
+    });
+    div.addEventListener('dragleave', () => div.classList.remove('drag-over'));
+    div.addEventListener('drop', e => {
+      e.preventDefault();
+      div.classList.remove('drag-over');
+      const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
+      const toIdx = parseInt(div.dataset.index);
+      if (fromIdx !== toIdx) {
+        const [moved] = fileItems.splice(fromIdx, 1);
+        fileItems.splice(toIdx, 0, moved);
+        renderFileList();
+      }
+    });
+
+    div.querySelector('.btn-del').addEventListener('click', () => removeFile(idx));
+    fileListEl.appendChild(div);
+  });
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function setStatus(msg, type) {
+  statusEl.textContent = msg;
+  statusEl.className = 'status' + (type ? ' ' + type : '');
+}
+
+// ==================== XML 工具 ====================
+function parseXml(text) {
+  return new DOMParser().parseFromString(text, 'application/xml');
+}
+
+function serializeXml(doc) {
+  return new XMLSerializer().serializeToString(doc);
+}
+
+async function readXml(zip, path) {
+  if (!zip.files[path]) return null;
+  return parseXml(await zip.files[path].async('string'));
+}
+
+async function readText(zip, path) {
+  if (!zip.files[path]) return null;
+  return zip.files[path].async('string');
+}
+
+async function getOutXml(outZip, path) {
+  if (outZip.files[path]) {
+    return parseXml(await outZip.files[path].async('string'));
+  }
+  return null;
+}
+
+function setOutXml(outZip, path, xmlDoc) {
+  outZip.file(path, serializeXml(xmlDoc));
+}
+
+function elName(el) {
+  return el.localName || el.nodeName.split(':').pop();
+}
+
+// ==================== 核心合并逻辑 ====================
+async function mergeAndDownload() {
+  if (!fileItems.length) { setStatus('请先选择 .docx 文件', 'error'); return; }
+  if (typeof JSZip === 'undefined') { setStatus('JSZip 库加载失败，请检查网络连接', 'error'); return; }
+
+  mergeBtn.disabled = true;
+  mergeBtn.textContent = '正在合并...';
+  setStatus('正在解析文档...', '');
+
+  try {
+    const options = {
+      body: document.getElementById('optBody').checked,
+      headers: document.getElementById('optHeaders').checked,
+      footers: document.getElementById('optFooters').checked,
+      pgNum: document.getElementById('optPgNum').checked,
+      pageSettings: document.querySelector('input[name="pageSettings"]:checked').value,
+    };
+
+    const zips = [];
+    for (const item of fileItems) {
+      zips.push(await JSZip.loadAsync(item.file));
+    }
+    setStatus(`已加载 ${zips.length} 个文档，开始合并...`, '');
+
+    const outZip = new JSZip();
+    await performMerge(zips, outZip, options);
+
+    setStatus('正在生成文件...', '');
+    const blob = await outZip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+
+    const baseName = fileItems.length === 1 ? fileItems[0].name.replace(/\.docx$/i, '') : '合并文档';
+    const fileName = baseName + '_merged.docx';
+
+    if (typeof saveAs !== 'undefined') {
+      saveAs(blob, fileName);
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    setStatus('合并完成！已下载: ' + fileName, 'success');
+  } catch (err) {
+    console.error(err);
+    setStatus('合并出错: ' + (err.message || err), 'error');
+  } finally {
+    mergeBtn.disabled = false;
+    mergeBtn.textContent = '合并并下载';
+  }
+}
+
+// ==================== 执行合并 ====================
+async function performMerge(zips, outZip, options) {
+  const docPath = 'word/document.xml';
+  const relsPath = 'word/_rels/document.xml.rels';
+  const stylesPath = 'word/styles.xml';
+  const numberingPath = 'word/numbering.xml';
+  const contentTypesPath = '[Content_Types].xml';
+
+  // 第一步：复制第一个文档的全部文件到输出
+  setStatus('正在复制基础文档结构...', '');
+  const firstZip = zips[0];
+  for (const path in firstZip.files) {
+    if (!firstZip.files[path].dir) {
+      outZip.file(path, await firstZip.files[path].async('arraybuffer'));
+    }
+  }
+
+  if (zips.length === 1) return;
+
+  // 第二步：逐个合并后续文档
+  for (let docIdx = 1; docIdx < zips.length; docIdx++) {
+    const curZip = zips[docIdx];
+    setStatus('正在合并第 ' + (docIdx + 1) + '/' + zips.length + ' 个文档...', '');
+
+    const curDocXml = await readXml(curZip, docPath);
+    const curRelsXml = await readXml(curZip, relsPath);
+    const curStylesXml = await readXml(curZip, stylesPath);
+    const curNumberingXml = await readXml(curZip, numberingPath);
+
+    if (!curDocXml) {
+      console.warn('文档 ' + (docIdx + 1) + ' 缺少 word/document.xml，跳过');
+      continue;
+    }
+
+    const outDocXml = await getOutXml(outZip, docPath);
+    const outRelsXml = await getOutXml(outZip, relsPath);
+    const outStylesXml = await getOutXml(outZip, stylesPath);
+    const outNumberingXml = await getOutXml(outZip, numberingPath);
+
+    // === 计算 rId 映射 ===
+    const ridMap = {};
+    if (curRelsXml && outRelsXml) {
+      const outRels = outRelsXml.documentElement.getElementsByTagNameNS(RELS_NS, 'Relationship');
+      let maxRid = 0;
+      for (let i = 0; i < outRels.length; i++) {
+        const id = outRels[i].getAttribute('Id');
+        if (id) {
+          const num = parseInt(id.replace('rId', ''));
+          if (num > maxRid) maxRid = num;
+        }
+      }
+
+      const curRels = curRelsXml.documentElement.getElementsByTagNameNS(RELS_NS, 'Relationship');
+      const relMappings = [];
+
+      for (let i = 0; i < curRels.length; i++) {
+        const rel = curRels[i];
+        const oldId = rel.getAttribute('Id');
+        const target = rel.getAttribute('Target');
+        const type = rel.getAttribute('Type');
+
+        let newId = null;
+        let newTarget = target;
+
+        if (target && (target.startsWith('media/') || target.startsWith('embeddings/'))) {
+          newId = 'rId' + (++maxRid);
+          const prefix = target.startsWith('media/') ? 'media/' : 'embeddings/';
+          const baseName = target.substring(prefix.length);
+          if (outZip.files['word/' + target]) {
+            newTarget = prefix + docIdx + '_' + baseName;
+          }
+          relMappings.push({ target, newTarget, oldId, newId, type, prefix });
+        } else if (target && (target.startsWith('header') || target.startsWith('footer')) &&
+                   (options.headers || options.footers)) {
+          const isHeader = target.startsWith('header');
+          if ((isHeader && options.headers) || (!isHeader && options.footers)) {
+            newId = 'rId' + (++maxRid);
+            if (outZip.files['word/' + target]) {
+              const dot = target.lastIndexOf('.');
+              newTarget = target.substring(0, dot) + '_' + docIdx + (dot >= 0 ? target.substring(dot) : '');
+            }
+            relMappings.push({ target, newTarget, oldId, newId, type, prefix:'' });
+          }
+        }
+
+        if (newId) {
+          ridMap[oldId] = newId;
+        }
+      }
+
+      // 添加新关系到输出
+      const outRelsRoot = outRelsXml.documentElement;
+      for (const m of relMappings) {
+        const newRel = outRelsXml.createElementNS(RELS_NS, 'Relationship');
+        newRel.setAttribute('Id', m.newId);
+        newRel.setAttribute('Type', m.type);
+        newRel.setAttribute('Target', m.newTarget);
+        outRelsRoot.appendChild(newRel);
+      }
+      setOutXml(outZip, relsPath, outRelsXml);
+
+      // 复制媒体文件
+      for (const m of relMappings) {
+        if (m.target.startsWith('media/') || m.target.startsWith('embeddings/')) {
+          if (curZip.files['word/' + m.target]) {
+            outZip.file('word/' + m.newTarget, await curZip.files['word/' + m.target].async('arraybuffer'));
+          }
+        }
+      }
+
+      // 复制页眉/页脚 XML
+      for (const m of relMappings) {
+        if (m.newTarget && !m.prefix && (m.target.startsWith('header') || m.target.startsWith('footer'))) {
+          if (curZip.files['word/' + m.target]) {
+            let hfContent = await curZip.files['word/' + m.target].async('string');
+            for (const oldRid in ridMap) {
+              hfContent = hfContent.replace(new RegExp('r:id="' + oldRid + '"', 'g'), 'r:id="' + ridMap[oldRid] + '"');
+            }
+            outZip.file('word/' + m.newTarget, hfContent);
+            await addContentType(outZip, 'word/' + m.newTarget,
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.' +
+              (m.target.startsWith('header') ? 'header' : 'footer') + '+xml');
+          }
+        }
+      }
+    }
+
+    // === 合并 document.xml ===
+    if (options.body && outDocXml && curDocXml) {
+      const outBody = outDocXml.getElementsByTagNameNS(W_NS, 'body')[0];
+      const curBody = curDocXml.getElementsByTagNameNS(W_NS, 'body')[0];
+      if (outBody && curBody) {
+        const children = [];
+        let lastSectPr = null;
+        for (let i = 0; i < curBody.childNodes.length; i++) {
+          const node = curBody.childNodes[i];
+          if (node.nodeType === 1 && node.namespaceURI === W_NS && elName(node) === 'sectPr') {
+            lastSectPr = node;
+          } else {
+            children.push(node);
+          }
+        }
+
+        if (children.length > 0) {
+          // 创建分页段落: <w:p><w:r><w:br w:type="page"/></w:r></w:p>
+          const pbPara = outDocXml.createElementNS(W_NS, 'w:p');
+          const ppr = outDocXml.createElementNS(W_NS, 'w:pPr');
+          const r = outDocXml.createElementNS(W_NS, 'w:r');
+          const br = outDocXml.createElementNS(W_NS, 'w:br');
+          br.setAttributeNS(W_NS, 'w:type', 'page');
+          r.appendChild(br);
+          pbPara.appendChild(ppr);
+          pbPara.appendChild(r);
+          outBody.appendChild(outDocXml.importNode(pbPara, true));
+
+          for (const child of children) {
+            const imported = outDocXml.importNode(child, true);
+            // 更新 r:id 属性
+            const allEls = imported.querySelectorAll('*');
+            for (let ei = 0; ei < allEls.length; ei++) {
+              const el = allEls[ei];
+              for (let ai = 0; ai < el.attributes.length; ai++) {
+                const attr = el.attributes[ai];
+                if (attr.namespaceURI === R_NS && ridMap[attr.value]) {
+                  attr.value = ridMap[attr.value];
+                }
+              }
+            }
+            outBody.appendChild(imported);
+          }
+        }
+
+        if (options.pageSettings === 'each' && lastSectPr) {
+          const importedSp = outDocXml.importNode(lastSectPr, true);
+          const refs = importedSp.querySelectorAll('*');
+          for (let ei = 0; ei < refs.length; ei++) {
+            const el = refs[ei];
+            for (let ai = 0; ai < el.attributes.length; ai++) {
+              const attr = el.attributes[ai];
+              if (attr.namespaceURI === R_NS && ridMap[attr.value]) {
+                attr.value = ridMap[attr.value];
+              }
+            }
+          }
+          outBody.appendChild(importedSp);
+        }
+        setOutXml(outZip, docPath, outDocXml);
+      }
+    }
+
+    // === 合并 styles.xml ===
+    if (curStylesXml && outStylesXml) {
+      mergeStyles(outStylesXml, curStylesXml);
+      setOutXml(outZip, stylesPath, outStylesXml);
+    }
+
+    // === 合并 numbering.xml ===
+    if (curNumberingXml && outNumberingXml) {
+      await mergeNumberingDom(outZip, outNumberingXml, curNumberingXml);
+    }
+
+    // === 更新 [Content_Types].xml ===
+    await mergeContentTypes(outZip, curZip);
+  }
+
+  // === 最后根据选项清理文档（只执行一次） ===
+  await cleanDocumentOptions(outZip, options);
+}
+
+// ==================== 合并样式 ====================
+function mergeStyles(outStylesXml, curStylesXml) {
+  const outRoot = outStylesXml.documentElement;
+  const curRoot = curStylesXml.documentElement;
+
+  // 合并 style 元素 (按 styleId 去重)
+  const outStyles = outRoot.getElementsByTagNameNS(W_NS, 'style');
+  const existingIds = new Set();
+  for (let i = 0; i < outStyles.length; i++) {
+    const sid = outStyles[i].getAttributeNS(W_NS, 'styleId');
+    if (sid) existingIds.add(sid);
+  }
+
+  const curStyleEls = curRoot.getElementsByTagNameNS(W_NS, 'style');
+  for (let i = 0; i < curStyleEls.length; i++) {
+    const sid = curStyleEls[i].getAttributeNS(W_NS, 'styleId');
+    if (sid && !existingIds.has(sid)) {
+      outRoot.appendChild(outStylesXml.importNode(curStyleEls[i], true));
+      existingIds.add(sid);
+    }
+  }
+
+  // 合并 latentStyles
+  const curLatent = curRoot.getElementsByTagNameNS(W_NS, 'latentStyles')[0];
+  const outLatent = outRoot.getElementsByTagNameNS(W_NS, 'latentStyles')[0];
+  if (curLatent) {
+    if (outLatent) {
+      const curLsdExs = curLatent.getElementsByTagNameNS(W_NS, 'lsdException');
+      const outLsdExs = outLatent.getElementsByTagNameNS(W_NS, 'lsdException');
+      const existingNames = new Set();
+      for (let i = 0; i < outLsdExs.length; i++) {
+        const name = outLsdExs[i].getAttributeNS(W_NS, 'name');
+        if (name) existingNames.add(name);
+      }
+      for (let i = 0; i < curLsdExs.length; i++) {
+        const name = curLsdExs[i].getAttributeNS(W_NS, 'name');
+        if (name && !existingNames.has(name)) {
+          outLatent.appendChild(outStylesXml.importNode(curLsdExs[i], true));
+          existingNames.add(name);
+        }
+      }
+    } else {
+      outRoot.appendChild(outStylesXml.importNode(curLatent, true));
+    }
+  }
+
+  // 合并 docDefaults
+  const curDefaults = curRoot.getElementsByTagNameNS(W_NS, 'docDefaults')[0];
+  if (curDefaults && !outRoot.getElementsByTagNameNS(W_NS, 'docDefaults')[0]) {
+    outRoot.insertBefore(outStylesXml.importNode(curDefaults, true), outRoot.firstChild);
+  }
+}
+
+// ==================== 合并编号 ====================
+async function mergeNumberingDom(outZip, outNumXml, curNumXml) {
+  const outRoot = outNumXml.documentElement;
+  const curRoot = curNumXml.documentElement;
+
+  // 找最大 ID
+  let maxAbsId = -1;
+  let maxNumId = -1;
+
+  const outAbs = outRoot.getElementsByTagNameNS(W_NS, 'abstractNum');
+  for (let i = 0; i < outAbs.length; i++) {
+    const v = parseInt(outAbs[i].getAttributeNS(W_NS, 'abstractNumId'));
+    if (!isNaN(v) && v > maxAbsId) maxAbsId = v;
+  }
+  const outNums = outRoot.getElementsByTagNameNS(W_NS, 'num');
+  for (let i = 0; i < outNums.length; i++) {
+    const v = parseInt(outNums[i].getAttributeNS(W_NS, 'numId'));
+    if (!isNaN(v) && v > maxNumId) maxNumId = v;
+  }
+
+  const curAbs = curRoot.getElementsByTagNameNS(W_NS, 'abstractNum');
+  const curNums = curRoot.getElementsByTagNameNS(W_NS, 'num');
+
+  if (curAbs.length === 0 && curNums.length === 0) return;
+
+  const absOffset = maxAbsId + 1;
+  const numOffset = maxNumId + 1;
+  const absIdMap = {};
+  const numIdMap = {};
+
+  // 添加 abstractNum, 偏移 ID
+  for (let i = 0; i < curAbs.length; i++) {
+    const oldId = parseInt(curAbs[i].getAttributeNS(W_NS, 'abstractNumId'));
+    if (isNaN(oldId)) continue;
+    const newId = oldId + absOffset;
+    absIdMap[oldId] = newId;
+
+    const el = outNumXml.importNode(curAbs[i], true);
+    el.setAttributeNS(W_NS, 'w:abstractNumId', newId);
+
+    // 更新 abstractNum 内部对其他 abstractNumId 的引用
+    const nsRefs = el.querySelectorAll('*');
+    for (let j = 0; j < nsRefs.length; j++) {
+      const sub = nsRefs[j];
+      if (elName(sub) === 'abstractNumId' && sub.namespaceURI === W_NS) {
+        const refVal = sub.getAttributeNS(W_NS, 'val');
+        if (refVal !== null) {
+          const refNum = parseInt(refVal);
+          if (!isNaN(refNum) && absIdMap[refNum] !== undefined) {
+            sub.setAttributeNS(W_NS, 'w:val', absIdMap[refNum]);
+          }
+        }
+      }
+    }
+    outRoot.appendChild(el);
+  }
+
+  // 添加 num, 偏移 ID 并更新引用的 abstractNumId
+  for (let i = 0; i < curNums.length; i++) {
+    const oldId = parseInt(curNums[i].getAttributeNS(W_NS, 'numId'));
+    if (isNaN(oldId)) continue;
+    const newId = oldId + numOffset;
+    numIdMap[oldId] = newId;
+
+    const el = outNumXml.importNode(curNums[i], true);
+    el.setAttributeNS(W_NS, 'w:numId', newId);
+
+    const innerRef = el.getElementsByTagNameNS(W_NS, 'abstractNumId')[0];
+    if (innerRef) {
+      const refVal = parseInt(innerRef.getAttributeNS(W_NS, 'val'));
+      if (!isNaN(refVal) && absIdMap[refVal] !== undefined) {
+        innerRef.setAttributeNS(W_NS, 'w:val', absIdMap[refVal]);
+      }
+    }
+    outRoot.appendChild(el);
+  }
+
+  setOutXml(outZip, 'word/numbering.xml', outNumXml);
+
+  // 更新 document.xml 中的 numId 引用 (使用 DOM)
+  if (Object.keys(numIdMap).length > 0 && outZip.files['word/document.xml']) {
+    const docStr = await outZip.files['word/document.xml'].async('string');
+    const docXml = parseXml(docStr);
+    if (docXml) {
+      const allNumId = docXml.getElementsByTagNameNS(W_NS, 'numId');
+      for (let i = 0; i < allNumId.length; i++) {
+        const val = allNumId[i].getAttributeNS(W_NS, 'val');
+        if (val !== null) {
+          const numVal = parseInt(val);
+          if (!isNaN(numVal) && numIdMap[numVal] !== undefined) {
+            allNumId[i].setAttributeNS(W_NS, 'w:val', numIdMap[numVal]);
+          }
+        }
+      }
+      setOutXml(outZip, 'word/document.xml', docXml);
+    }
+  }
+}
+
+// ==================== 合并 Content_Types ====================
+async function mergeContentTypes(outZip, curZip) {
+  const ctPath = '[Content_Types].xml';
+  if (!outZip.files[ctPath] || !curZip.files[ctPath]) return;
+
+  const outText = await outZip.files[ctPath].async('string');
+  const curText = await curZip.files[ctPath].async('string');
+  const outCt = parseXml(outText);
+  const curCt = parseXml(curText);
+  if (!outCt || !curCt) return;
+
+  const outTypes = outCt.documentElement;
+  const curOverrides = curCt.documentElement.getElementsByTagNameNS(CT_NS, 'Override');
+  const outOverrides = outTypes.getElementsByTagNameNS(CT_NS, 'Override');
+
+  const outPartNames = new Set();
+  for (let i = 0; i < outOverrides.length; i++) {
+    outPartNames.add(outOverrides[i].getAttribute('PartName'));
+  }
+  for (let i = 0; i < curOverrides.length; i++) {
+    const pn = curOverrides[i].getAttribute('PartName');
+    if (!outPartNames.has(pn)) {
+      outTypes.appendChild(outCt.importNode(curOverrides[i], true));
+    }
+  }
+
+  // Defaults
+  const curDefaults = curCt.documentElement.getElementsByTagNameNS(CT_NS, 'Default');
+  const outDefaults = outTypes.getElementsByTagNameNS(CT_NS, 'Default');
+  const outExtensions = new Set();
+  for (let i = 0; i < outDefaults.length; i++) {
+    outExtensions.add(outDefaults[i].getAttribute('Extension'));
+  }
+  for (let i = 0; i < curDefaults.length; i++) {
+    const ext = curDefaults[i].getAttribute('Extension');
+    if (!outExtensions.has(ext)) {
+      outTypes.appendChild(outCt.importNode(curDefaults[i], true));
+    }
+  }
+
+  setOutXml(outZip, ctPath, outCt);
+}
+
+async function addContentType(outZip, path, type) {
+  const ctPath = '[Content_Types].xml';
+  if (!outZip.files[ctPath]) return;
+  const text = await outZip.files[ctPath].async('string');
+  const ct = parseXml(text);
+  if (!ct) return;
+
+  const root = ct.documentElement;
+  const partName = '/' + path.replace(/\\/g, '/');
+
+  const existing = root.getElementsByTagNameNS(CT_NS, 'Override');
+  let found = false;
+  for (let i = 0; i < existing.length; i++) {
+    if (existing[i].getAttribute('PartName') === partName) { found = true; break; }
+  }
+  if (!found) {
+    const override = ct.createElementNS(CT_NS, 'Override');
+    override.setAttribute('PartName', partName);
+    override.setAttribute('ContentType', type);
+    root.appendChild(override);
+    setOutXml(outZip, ctPath, ct);
+  }
+}
+
+// ==================== 根据选项清理文档 ====================
+async function cleanDocumentOptions(outZip, options) {
+  if (!outZip.files['word/document.xml']) return;
+  const docStr = await outZip.files['word/document.xml'].async('string');
+  const docXml = parseXml(docStr);
+  if (!docXml) return;
+
+  const allSectPr = docXml.getElementsByTagNameNS(W_NS, 'sectPr');
+  for (let si = 0; si < allSectPr.length; si++) {
+    const sp = allSectPr[si];
+    const toRemove = [];
+    for (let ci = 0; ci < sp.childNodes.length; ci++) {
+      const child = sp.childNodes[ci];
+      if (child.nodeType === 1 && child.namespaceURI === W_NS) {
+        const ln = elName(child);
+        if (ln === 'headerReference' && !options.headers) toRemove.push(child);
+        if (ln === 'footerReference' && !options.footers) toRemove.push(child);
+        if (ln === 'pgNumType' && !options.pgNum) toRemove.push(child);
+      }
+    }
+    for (const el of toRemove) el.parentNode.removeChild(el);
+  }
+  setOutXml(outZip, 'word/document.xml', docXml);
+}
+
+// ==================== 启动 ====================
+mergeBtn.addEventListener('click', mergeAndDownload);
+
+setTimeout(() => {
+  if (typeof JSZip === 'undefined') {
+    setStatus('JSZip 库加载中，请确保网络连接正常', 'error');
+  }
+}, 3000);
+</script>
+</body>
+</html>
