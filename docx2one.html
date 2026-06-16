@@ -40,7 +40,11 @@ header p{font-size:14px;color:#888;margin-top:6px}
 .opt-group label{display:flex;align-items:center;gap:7px;font-size:14px;cursor:pointer;color:#444;user-select:none}
 .opt-group label input[type="checkbox"]{width:16px;height:16px;accent-color:#4361ee;cursor:pointer}
 .opt-group label input[type="radio"]{width:16px;height:16px;accent-color:#4361ee;cursor:pointer}
-.actions{display:flex;justify-content:center;margin-top:20px}
+.filename-row{display:flex;align-items:center;gap:10px;justify-content:center;margin-top:16px}
+.filename-row label{font-size:14px;color:#555;white-space:nowrap}
+.filename-row input{padding:7px 12px;border:1px solid #ccc;border-radius:6px;font-size:14px;width:220px;outline:none;transition:border-color .15s}
+.filename-row input:focus{border-color:#4361ee;box-shadow:0 0 0 2px rgba(67,97,238,0.1)}
+.actions{display:flex;justify-content:center;margin-top:16px}
 .actions button{padding:12px 48px;font-size:16px;font-weight:600;background:#4361ee;color:#fff;border:none;border-radius:8px;cursor:pointer;transition:background .15s,transform .1s;letter-spacing:0.5px}
 .actions button:hover{background:#3651d4}
 .actions button:active{transform:scale(.97)}
@@ -92,6 +96,10 @@ header p{font-size:14px;color:#888;margin-top:6px}
     </div>
   </div>
 
+  <div class="filename-row" id="filenameRow" style="display:none">
+    <label for="filenameInput">输出文件名:</label>
+    <input type="text" id="filenameInput" value="合并文档">
+  </div>
   <div class="actions" id="actions" style="display:none">
     <button id="mergeBtn">合并并下载</button>
   </div>
@@ -169,12 +177,17 @@ function renderFileList() {
     fileSection.classList.remove('visible');
     optionsCard.style.display = 'none';
     actions.style.display = 'none';
+    document.getElementById('filenameRow').style.display = 'none';
     return;
   }
   fileSection.classList.add('visible');
   optionsCard.style.display = 'block';
   actions.style.display = 'flex';
+  document.getElementById('filenameRow').style.display = 'flex';
   fileCount.textContent = fileItems.length;
+  // Set default filename
+  const fname = fileItems.length === 1 ? fileItems[0].name.replace(/\.docx$/i, '') + '_merged' : '合并文档';
+  document.getElementById('filenameInput').value = fname;
 
   fileItems.forEach((item, idx) => {
     const div = document.createElement('div');
@@ -300,8 +313,7 @@ async function mergeAndDownload() {
     setStatus('正在生成文件...', '');
     const blob = await outZip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
 
-    const baseName = fileItems.length === 1 ? fileItems[0].name.replace(/\.docx$/i, '') : '合并文档';
-    const fileName = baseName + '_merged.docx';
+    const fileName = (document.getElementById('filenameInput').value || '合并文档') + '.docx';
 
     if (typeof saveAs !== 'undefined') {
       saveAs(blob, fileName);
