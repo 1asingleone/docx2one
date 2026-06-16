@@ -2,7 +2,11 @@
 
 Merge multiple Word (.docx) documents into one — right in your browser. No uploads, no servers, no installation.
 
+**Try online:** https://1asingleone.github.io/docx2one/docx2one.html
+
 合并多个 Word 文档为一个文件 — 纯浏览器端完成，不上传、不安装、开箱即用。
+
+**在线使用:** https://1asingleone.github.io/docx2one/docx2one.html
 
 ---
 
