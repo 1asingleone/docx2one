@@ -8,6 +8,13 @@ Merge multiple Word (.docx) documents into one — right in your browser. No upl
 
 ---
 
+## See also / 同类工具
+
+| 工具 | 格式 |
+|------|------|
+| [pdf2one](https://github.com/1asingleone/pdf2one) | PDF 合并 |
+| [pptx2one](https://github.com/1asingleone/pptx2one) | PPT 幻灯片合并 |
+
 ## 详细介绍
 
 ### 这是什么？
@@ -86,13 +93,6 @@ docx2one 是一个纯前端工具，让你在浏览器中直接合并多个 Word
 - Chrome 60+, Edge 79+, Firefox 55+, Safari 12+
 - `.docx` only (Office 2007+). Legacy `.doc` is **not** supported
 - Recommended: up to 10 documents at once
-
-## See also
-
-| 同类工具 | 格式 |
-|----------|------|
-| [pdf2one](https://github.com/1asingleone/pdf2one) | PDF 合并 |
-| [pptx2one](https://github.com/1asingleone/pptx2one) | PPT 幻灯片合并 |
 
 ## License
 
