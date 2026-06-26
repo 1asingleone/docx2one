@@ -35,6 +35,13 @@ Merge multiple Word (.docx) documents into one — right in your browser. No upl
 - `.docx` only (Office 2007+). Legacy `.doc` is **not** supported
 - Recommended: up to 10 documents at once
 
+## See also
+
+| 同类工具 | 格式 |
+|----------|------|
+| [pdf2one](https://github.com/1asingleone/pdf2one) | PDF 合并 |
+| [pptx2one](https://github.com/1asingleone/pptx2one) | PPT 幻灯片合并 |
+
 ## License
 
 MIT
